@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Coding Agent</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #1a1d29;
+    --border: #2a2e3d;
+    --accent: #7c5cff;
+    --accent-hover: #6a4ce0;
+    --text: #e8e9f0;
+    --text-dim: #8b8fa3;
+    --success: #4ade80;
+    --error: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+  header {
+    text-align: center;
+    padding: 24px 0 8px;
+  }
+  header h1 {
+    font-size: 1.5rem;
+    margin: 0 0 4px;
+    background: linear-gradient(135deg, #7c5cff, #ff5ca8);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header p { color: var(--text-dim); font-size: 0.9rem; margin: 0; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-top: 16px;
+  }
+  .panel h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    margin: 0 0 12px;
+  }
+  label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    margin-top: 10px;
+  }
+  input, textarea {
+    width: 100%;
+    background: #12141c;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: inherit;
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 14px;
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--accent-hover); }
+  button:disabled { background: #3a3d4d; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  button.secondary:hover { background: #22253300; border-color: var(--accent); }
+
+  pre {
+    background: #12141c;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .status {
+    font-size: 0.85rem;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-top: 12px;
+  }
+  .status.success { background: rgba(74,222,128,0.1); color: var(--success); border: 1px solid rgba(74,222,128,0.3); }
+  .status.error { background: rgba(248,113,113,0.1); color: var(--error); border: 1px solid rgba(248,113,113,0.3); }
+  .status.loading { background: rgba(124,92,255,0.1); color: var(--accent); border: 1px solid rgba(124,92,255,0.3); }
+
+  .hidden { display: none; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🤖 AI Coding Agent</h1>
+    <p>Instruction do → AI code likhega → seedha GitHub par push karega</p>
+  </header>
+
+  <div class="panel">
+    <h2>Step 1 — File batao</h2>
+    <label>File path (repo ke andar)</label>
+    <input id="filePath" placeholder="e.g. index.html ya src/app.js" />
+  </div>
+
+  <div class="panel">
+    <h2>Step 2 — Instruction do</h2>
+    <label>Kya karna hai is file mein?</label>
+    <textarea id="instruction" placeholder="e.g. Ek naya button add karo jo click par alert dikhaye"></textarea>
+    <button id="generateBtn">✨ Code Generate Karo</button>
+  </div>
+
+  <div id="resultPanel" class="panel hidden">
+    <h2>Step 3 — Preview & Push</h2>
+    <label>AI ne ye code banaya:</label>
+    <pre id="codePreview"></pre>
+    <button id="pushBtn">🚀 GitHub Par Push Karo</button>
+    <button id="cancelBtn" class="secondary">Cancel</button>
+  </div>
+
+  <div id="statusBox"></div>
+</div>
+
+<script>
+  const filePathEl = document.getElementById('filePath');
+  const instructionEl = document.getElementById('instruction');
+  const generateBtn = document.getElementById('generateBtn');
+  const resultPanel = document.getElementById('resultPanel');
+  const codePreview = document.getElementById('codePreview');
+  const pushBtn = document.getElementById('pushBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const statusBox = document.getElementById('statusBox');
+
+  let generatedCode = "";
+  let currentFilePath = "";
+
+  function showStatus(msg, type) {
+    statusBox.innerHTML = `<div class="status ${type}">${msg}</div>`;
+  }
+
+  generateBtn.addEventListener('click', async () => {
+    const filePath = filePathEl.value.trim();
+    const instruction = instructionEl.value.trim();
+
+    if (!filePath || !instruction) {
+      showStatus('⚠️ File path aur instruction dono zaroori hain', 'error');
+      return;
+    }
+
+    generateBtn.disabled = true;
+    showStatus('🧠 AI file padh raha hai aur code likh raha hai...', 'loading');
+    resultPanel.classList.add('hidden');
+
+    try {
+      const readRes = await fetch('/.netlify/functions/github', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'read', filePath }),
+      });
+      const readData = await readRes.json();
+
+      const chatRes = await fetch('/.netlify/functions/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          instruction,
+          fileContent: readData.content,
+          filePath,
+        }),
+      });
+      const chatData = await chatRes.json();
+
+      if (chatData.error) throw new Error(chatData.error);
+
+      generatedCode = chatData.updatedCode;
+      currentFilePath = filePath;
+
+      codePreview.textContent = generatedCode;
+      resultPanel.classList.remove('hidden');
+      showStatus('✅ Code ready hai — check karke push karo', 'success');
+    } catch (err) {
+      showStatus('❌ Error: ' + err.message, 'error');
+    } finally {
+      generateBtn.disabled = false;
+    }
+  });
+
+  pushBtn.addEventListener('click', async () => {
+    pushBtn.disabled = true;
+    showStatus('🚀 GitHub par push ho raha hai...', 'loading');
+
+    try {
+      const res = await fetch('/.netlify/functions/github', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'write',
+          filePath: currentFilePath,
+          newContent: generatedCode,
+          commitMessage: `AI update: ${currentFilePath}`,
+        }),
+      });
+      const data = await res.json();
+
+      if (data.error) throw new Error(data.error);
+
+      showStatus(
+        `✅ Push ho gaya! <a href="${data.commitUrl}" target="_blank">Commit dekho</a>`,
+        'success'
+      );
+      resultPanel.classList.add('hidden');
+      instructionEl.value = '';
+    } catch (err) {
+      showStatus('❌ Push fail hua: ' + err.message, 'error');
+    } finally {
+      pushBtn.disabled = false;
+    }
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    resultPanel.classList.add('hidden');
+    showStatus('', '');
+    statusBox.innerHTML = '';
+  });
+</script>
+</body>
+</html>
